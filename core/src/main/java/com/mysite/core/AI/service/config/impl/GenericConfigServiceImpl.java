@@ -20,16 +20,16 @@ public class GenericConfigServiceImpl implements GenericConfigService {
     @ObjectClassDefinition(name = "Generic - Configuration")
     public @interface Config {
 
-        @AttributeDefinition(name = "ChatGptApiKey",required = false,type = AttributeType.STRING)
-        String setChatGptKey() default "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";
+        @AttributeDefinition(name = "ChatGptApiKey", required = false, type = AttributeType.STRING)
+        String setChatGptKey() default "";
 
-        @AttributeDefinition(name = "ChatGptApiImageKey",required = false,type = AttributeType.STRING)
-        String setChatGptImageKey() default "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";
+        @AttributeDefinition(name = "ChatGptApiImageKey", required = false, type = AttributeType.STRING)
+        String setChatGptImageKey() default "";
 
-        @AttributeDefinition(name = "ChatGptApiEndpoint",required = false,type = AttributeType.STRING)
+        @AttributeDefinition(name = "ChatGptApiEndpoint", required = false, type = AttributeType.STRING)
         String setChatgptApiEndpoint() default "";
 
-        @AttributeDefinition(name = "ChatGptApiImageEndpoint",required = false,type = AttributeType.STRING)
+        @AttributeDefinition(name = "ChatGptApiImageEndpoint", required = false, type = AttributeType.STRING)
         String setChatgptApiImageEndpoint() default "";
 
     }
@@ -37,12 +37,13 @@ public class GenericConfigServiceImpl implements GenericConfigService {
     @Activate
     @Modified
     protected void activate(Config config) {
-        this.configMap.put("set-ChatGpt-Key",config.setChatGptKey());
-        this.configMap.put("set-chatGptImage-key",config.setChatGptImageKey());
-        this.configMap.put("set-chatGptApiEndpoint",config.setChatgptApiEndpoint());
-        this.configMap.put("set-chatGptApiImageEndpoint",config.setChatgptApiImageEndpoint());
+        this.configMap.put("set-ChatGpt-Key", config.setChatGptKey());
+        this.configMap.put("set-chatGptImage-key", config.setChatGptImageKey());
+        this.configMap.put("set-chatGptApiEndpoint", config.setChatgptApiEndpoint());
+        this.configMap.put("set-chatGptApiImageEndpoint", config.setChatgptApiImageEndpoint());
 
     }
+
     @Override
     public Map<String, String> getConfig() {
         return Collections.unmodifiableMap(this.configMap);
