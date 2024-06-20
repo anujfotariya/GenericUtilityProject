@@ -61,12 +61,7 @@ public class GenericBlogsServlet extends SlingAllMethodsServlet {
             response.getWriter().println(blogs);
 
         }
-        //catch (ContentFragmentException e) {
-//            throw new RuntimeException(e);
-//        }
-//        catch (ReplicationException e) {
-//            throw new RuntimeException(e);
-//        }
+
         catch (Exception e)
         {
             logger.error("Exception :{}",e);
