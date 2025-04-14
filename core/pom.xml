@@ -26,6 +26,13 @@
     <artifactId>mysite.core</artifactId>
     <name>My Site - Core</name>
     <description>Core bundle for My Site</description>
+    <repositories>
+        <repository>
+            <id>AsposeJavaAPI</id>
+            <name>Aspose Java API</name>
+            <url>https://repository.aspose.com/repo/</url>
+        </repository>
+    </repositories>
     <build>
         <plugins>
             <plugin>
@@ -43,7 +50,16 @@
                         </goals>
                         <configuration>
                             <bnd><![CDATA[
-Import-Package: javax.annotation;version=0.0.0,*
+Bundle-Category: mysite
+Import-Package: javax.annotation;version=0.0.0,!sun.awt.image, !com.sun.imageio.*,javax.xml.parsers.*,org.sejda.imageio.*,com.luciad.imageio.*,!io.github.resilience4j.*,  !net.sf.cglib.*, redis.clients.jedis,*,*
+Export-Package: com.aspose.imaging.*, com.sun.imageio.*, android.os, com.aspose.imaging.internal.my.i,com.luciad.imageio.*, org.apache.commons.pool2.*, redis.clients.jedis.*
+-exportcontents: ${packages;VERSIONED}
+Embed-Dependency: com.luciad.imageio.*,redis.clients.jedis.*, org.apache.commons.pool2.*, org.sejda.imageio:webp-imageio*,com.aspose.imaging.*;scope=compile|runtime
+Embed-Transitive: true
+Sling-Model-Packages: com.mysite.core.models
+-snapshot: ${tstamp;yyyyMMddHHmmssSSS}
+Bundle-DocURL:
+-plugin org.apache.sling.caconfig.bndplugin.ConfigurationClassScannerPlugin
                                 ]]></bnd>
                         </configuration>
                     </execution>
@@ -77,10 +93,40 @@ Import-Package: javax.annotation;version=0.0.0,*
                     </archive>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>9</source>
+                    <target>9</target>
+                </configuration>
+            </plugin>
+
+
         </plugins>
     </build>
 
+
     <dependencies>
+        <dependency>
+            <groupId>com.aspose</groupId>
+            <artifactId>aspose-imaging</artifactId>
+            <version>24.7</version>
+            <classifier>jdk16</classifier>
+        </dependency>
+        <dependency>
+            <groupId>com.aspose</groupId>
+            <artifactId>aspose-imaging</artifactId>
+            <version>24.7</version>
+            <classifier>javadoc</classifier>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.sejda.imageio/webp-imageio -->
+        <dependency>
+            <groupId>org.sejda.imageio</groupId>
+            <artifactId>webp-imageio</artifactId>
+            <version>0.1.6</version>
+        </dependency>
+
         <dependency>
             <groupId>uk.org.lidalia</groupId>
             <artifactId>slf4j-test</artifactId>
@@ -95,6 +141,28 @@ Import-Package: javax.annotation;version=0.0.0,*
             <artifactId>core.wcm.components.core</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/redis.clients/jedis -->
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <version>5.2.0</version>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/cglib/cglib -->
+        <dependency>
+            <groupId>cglib</groupId>
+            <artifactId>cglib</artifactId>
+            <version>3.2.6</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-pool2 -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-pool2</artifactId>
+            <version>2.11.0</version>
+        </dependency>
+
+
+
 
 
         <!-- Testing -->

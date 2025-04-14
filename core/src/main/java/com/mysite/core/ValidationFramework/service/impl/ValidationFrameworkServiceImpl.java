@@ -39,6 +39,7 @@ public class ValidationFrameworkServiceImpl implements ValidationFrameworkServic
                     Node cfdatanode= iterator.nextNode();
                     if(checkRepPolicyNode(cfdatanode) && checkJcrContentNode(cfdatanode) && checkCheckBoxNode(cfdatanode) && checkRadioNode(cfdatanode) && checkSelectDropdownNode(cfdatanode))
                     {
+
                         if(cfdatanode.getName().equals("dob"))
                         {
                             datamap.put("dob","<div data-valid-name=\""+cfdatanode.getNode("jcr:content").getNode("data").getNode("master").getProperty("dataValidName").getString()+"\">\n" +
