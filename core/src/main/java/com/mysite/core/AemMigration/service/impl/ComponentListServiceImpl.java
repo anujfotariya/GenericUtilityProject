@@ -2,10 +2,12 @@ package com.mysite.core.AemMigration.service.impl;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-
+import com.mysite.core.AemMigration.configs.ComponentResourceTypeService;
 import com.mysite.core.AemMigration.service.ComponentListService;
 import org.apache.sling.api.resource.Resource;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,215 +19,152 @@ import java.util.*;
 public class ComponentListServiceImpl implements ComponentListService{
     Logger logger= LoggerFactory.getLogger(this.getClass());
 
+    @Reference
+    ComponentResourceTypeService componentResourceTypeService;
+
+
+    Set<String> multiFieldType;
+    Set<String> tabTypes;
+    Set<String> containerTypes;
+
+    Set<String>fixedColumnTypes;
+
+    Set<String>wellTypes;
+
+    @Activate
+    protected void activate(){
+        multiFieldType= componentResourceTypeService.getMultiFieldTypes();
+        tabTypes=componentResourceTypeService.getTabTypes();
+        containerTypes=componentResourceTypeService.getContainerTypes();
+        fixedColumnTypes=componentResourceTypeService.getFixedColumnTypes();
+        wellTypes=componentResourceTypeService.getWellTypes();
+    }
+
+
     @Override
-    public Map<String, List<String>> scanComponentsRecursive(Resource resource, List<String> multifieldList, List<String> componentsWithMultifield,String caller) throws RepositoryException {
+    public Map<String, List<String>> scanComponentsRecursive(Resource resource, List<String> multifieldList, List<String> componentsWithMultifield, String caller) throws RepositoryException {
         if (isComponent(resource)) {
             Resource dialogResource = resource.getChild("cq:dialog");
-
-//            findMultifieldComponents(resource, componentsWithMultifield);
-            processDialogElement(dialogResource,multifieldList,componentsWithMultifield);
+            processDialogElement(dialogResource, multifieldList, componentsWithMultifield);
         }
-        if(caller.equals("Servlet")){
+
+        if ("Servlet".equals(caller)) {
             for (Resource child : resource.getChildren()) {
-                scanComponentsRecursive(child, multifieldList,componentsWithMultifield,caller);
+                scanComponentsRecursive(child, multifieldList, componentsWithMultifield, caller);
             }
         }
-
 
         Map<String, List<String>> result = new HashMap<>();
         result.put("Multifield", multifieldList);
         result.put("NestedMultifield", componentsWithMultifield);
         return result;
-        // return multifieldList;
     }
 
     private boolean isComponent(Resource resource) {
         Node node = resource.adaptTo(Node.class);
-
         try {
-            return node.getProperty("jcr:primaryType").getString().equals("cq:Component") && resource.getChild("cq:dialog") != null;
+            return node != null && "cq:Component".equals(node.getProperty("jcr:primaryType").getString()) && resource.getChild("cq:dialog") != null;
         } catch (RepositoryException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private void processDialogElement(Resource resource,List<String> multifieldList,List<String> componentsWithMultifield) throws RepositoryException {
-        try{
-            JsonObject jsonObject = new JsonObject();
-            //List<String> nestedMultifieldlst=new ArrayList<>();
+    private void processDialogElement(Resource resource, List<String> multifieldList, List<String> componentsWithMultifield) throws RepositoryException {
+        if (resource == null) return;
+        String resourceType = getPropertyValue(resource, "sling:resourceType");
 
-            Node node = resource.adaptTo(Node.class);
-            if (node == null) {
-                logger.error("Exception{}",node);
+        if ("cq/gui/components/authoring/dialog".equals(resourceType)) {
+            Resource items = Optional.ofNullable(resource.getChild("content/items/column/items")).orElse(resource.getChild("content/items"));
+            if (items != null) {
+                processChildren(items, multifieldList, componentsWithMultifield);
             }
+        } else if (tabTypes.contains(resourceType)) {
+            Optional.ofNullable(resource.getChild("items"))
+                    .ifPresent(items -> items.getChildren()
+                            .forEach(tab -> Optional.ofNullable(tab.getChild("items"))
+                                    .ifPresent(tabItems -> {
+                                        try {
+                                            processChildren(tabItems, multifieldList, componentsWithMultifield);
+                                        } catch (RepositoryException e) {
+                                            logger.error("Error in tab processing", e);
+                                        }
+                                    })));
+        } else if (multiFieldType.contains(resourceType)) {
+            String basePath = resource.getPath().split("/cq:dialog")[0];
+            multifieldList.add(basePath);
 
-
-            String resourceType = getPropertyValue(resource, "sling:resourceType");
-
-            if ("cq/gui/components/authoring/dialog".equals(resourceType)) {
-                Resource contentResource = resource.getChild("content");
-                if (contentResource != null) {
-                    Resource itemsResource = contentResource.getChild("items");
-                    Resource item = null;
-                    if(Objects.nonNull(itemsResource.getChild("column")))
-                    {
-                        Resource column= itemsResource.getChild("column");
-                        if(Objects.nonNull(column.getChild("items")))
-                        {
-                            item= column.getChild("items");
-
-                        }
-                    }
-                    else {
-                        item=itemsResource;
-                    }
-//                    Resource column= itemsResource.getChild("column");
-//                    Resource item= column.getChild("items");
-                    if (item != null) {
-                        processChildren(item,multifieldList,componentsWithMultifield);
-                    }
-                }
-            } else if ("granite/ui/components/coral/foundation/tabs".equals(resourceType)) {
-                Resource itemsResource = resource.getChild("items");
-                if (itemsResource != null) {
-                    for (Resource tabResource : itemsResource.getChildren()) {
-
-                        Resource tabItemsResource = tabResource.getChild("items");
-                        if (tabItemsResource != null) {
-                            processChildren(tabItemsResource,multifieldList,componentsWithMultifield);
-                        }
-
-                    }
-                }
-
+            if (containsNestedMultifield(resource)) {
+                componentsWithMultifield.add(basePath);
             }
-
-            else if ("granite/ui/components/coral/foundation/form/multifield".equals(resourceType)) {
-                // List<Object> stringList=new ArrayList<>();
-                // JsonObject jsonObject1=new JsonObject();
-                if(containsNestedMultifield(resource)){
-                    if(resource.getPath().contains("/cq:dialog")){
-                        String path= resource.getPath().substring(0,resource.getPath().indexOf("/cq:dialog"));
-                        componentsWithMultifield.add(path);
-                    }
-
-//                    stringList.add(resource.getPath());
-                    //componentsWithMultifield.add(jsonObject1);
-
-                }
-                if(resource.getPath().contains("/cq:dialog")){
-                    String path= resource.getPath().substring(0,resource.getPath().indexOf("/cq:dialog"));
-                    multifieldList.add(path);
-                }
-
-
-
-//            Resource fieldResource = resource.getChild("field");
-//            if (fieldResource != null) {
-//                Resource itemsResource = fieldResource.getChild("items");
-//                if (itemsResource != null) {
-//                    JsonArray nestedFields = new JsonArray();
-//                    processChildren(itemsResource,componentsWithMultifield);
-//                    componentsWithMultifield.add(resource.getPath());
-//                }
-//            }
-
-            }
-        }catch (Exception e)
-        {
-            logger.error("Exception in process dialog{}",e.getMessage());
         }
-
-
     }
 
-    private void processChildren(Resource resource,List<String> multifieldList,List<String> componentsWithMultifield) throws RepositoryException {
-        try{
-            for (Resource childResource : resource.getChildren()) {
-                String resourceType = getPropertyValue(childResource, "sling:resourceType");
-                if ("granite/ui/components/coral/foundation/container".equals(resourceType)) {
-                    Resource itemsResource = childResource.getChild("items");
-                    if (itemsResource != null) {
-                        processChildren(itemsResource,multifieldList,componentsWithMultifield);
-                    }
-                }
-                else if ("granite/ui/components/coral/foundation/fixedcolumns".equals(resourceType)) {
-                    Resource itemsResource = childResource.getChild("items");
-                    if (itemsResource != null) {
-                        processChildren(itemsResource, multifieldList, componentsWithMultifield);
-                    }
-                }
-                else if ("granite/ui/components/coral/foundation/well".equals(resourceType)) {
-                    Resource itemsResource = childResource.getChild("items");
-                    if (itemsResource != null) {
-                        processChildren(itemsResource, multifieldList, componentsWithMultifield);
-                    }
-                }else if ("granite/ui/components/coral/foundation/tabs".equals(resourceType)) {
-                    processDialogElement(childResource,multifieldList,componentsWithMultifield);
-
-                } else if (resourceType != null && resourceType.contains("/foundation/form/")) {
-                    processDialogElement(childResource,multifieldList,componentsWithMultifield);
-                }
-
-
+    private void processChildren(Resource resource, List<String> multifieldList, List<String> componentsWithMultifield) throws RepositoryException {
+        for (Resource child : resource.getChildren()) {
+            String resourceType = getPropertyValue(child, "sling:resourceType");
+            if (containerTypes.contains(resourceType)
+                    || fixedColumnTypes.contains(resourceType)
+                    || wellTypes.contains(resourceType)) {
+                Optional.ofNullable(child.getChild("items"))
+                        .ifPresent(items -> {
+                            try {
+                                processChildren(items, multifieldList, componentsWithMultifield);
+                            } catch (RepositoryException e) {
+                                logger.error("Error processing child items", e);
+                            }
+                        });
+            } else if (tabTypes.contains(resourceType) || (resourceType != null && resourceType.contains("/foundation/form/"))) {
+                processDialogElement(child, multifieldList, componentsWithMultifield);
             }
-        }catch (Exception e)
-        {
-            logger.error("Exception in process children {}",e.getMessage());
         }
+    }
 
+    private boolean containsNestedMultifield(Resource resource) throws RepositoryException {
+        Resource fieldResource = resource.getChild("field/items");
+        if (fieldResource != null) {
+            List<String> nestedPaths = new ArrayList<>();
+            processChildrenForNestedField(fieldResource, nestedPaths);
+            return !nestedPaths.isEmpty();
+        }
+        return false;
+    }
+
+    private void processChildrenForNestedField(Resource resource, List<String> pathList) throws RepositoryException {
+        for (Resource child : resource.getChildren()) {
+            String resourceType = getPropertyValue(child, "sling:resourceType");
+            if (containerTypes.contains(resourceType) || fixedColumnTypes.contains(resourceType) || wellTypes.contains(resourceType)) {
+                Optional.ofNullable(child.getChild("items"))
+                        .ifPresent(items -> {
+                            try {
+                                processChildrenForNestedField(items, pathList);
+                            } catch (RepositoryException e) {
+                                logger.error("Error in nested field", e);
+                            }
+                        });
+            } else if (tabTypes.contains(resourceType) || (resourceType != null && resourceType.contains("/foundation/form/"))) {
+                processDialogElementForNestedField(child, pathList);
+            }
+        }
+    }
+
+    private void processDialogElementForNestedField(Resource resource, List<String> pathList) throws RepositoryException {
+        String resourceType = getPropertyValue(resource, "sling:resourceType");
+        if (tabTypes.contains(resourceType)) {
+            Optional.ofNullable(resource.getChild("items"))
+                    .ifPresent(items -> items.getChildren().forEach(tab -> Optional.ofNullable(tab.getChild("items"))
+                            .ifPresent(tabItems -> {
+                                try {
+                                    processChildrenForNestedField(tabItems, pathList);
+                                } catch (RepositoryException e) {
+                                    logger.error("Error in nested tab", e);
+                                }
+                            })));
+        } else if (multiFieldType.contains(resourceType)) {
+            pathList.add(resource.getPath());
+        }
     }
 
     private String getPropertyValue(Resource resource, String propertyName) {
-        return resource.getValueMap().get(propertyName, "");
-    }
-
-    private boolean containsNestedMultifield(Resource resource) {
-        boolean hasMultifield = false;
-        boolean hasNestedMultifield = false;
-        // JsonArray jsonArray=new JsonArray();
-
-//        for (Resource child : resource.getChildren()) {
-        String resourceType = resource.getValueMap().get("sling:resourceType", String.class);
-        if ("granite/ui/components/coral/foundation/form/multifield".equals(resourceType)) {
-            hasMultifield = true;
-            Resource fieldResource = resource.getChild("field").getChild("items").getChild("column").getChild("items");
-            if (fieldResource != null && fieldResource.hasChildren()) {
-                for (Resource fieldChild : fieldResource.getChildren()) {
-                    String fieldType = fieldChild.getValueMap().get("sling:resourceType", String.class);
-                    if ("granite/ui/components/coral/foundation/form/multifield".equals(fieldType)) {
-                        hasNestedMultifield = true;
-                        //nestedList.add(fieldChild.getPath());
-                        //jsonObject.add("Fields",jsonArray);
-                        break;
-                    }
-                }
-            }
-        }
-        //}
-        return hasNestedMultifield;
-    }
-
-    private boolean containsMultifield(Resource resource) {
-        boolean hasMultifield = false;
-        //boolean hasNestedMultifield = false;
-
-//        for (Resource child : resource.getChildren()) {
-        String resourceType = resource.getValueMap().get("sling:resourceType", String.class);
-        if ("granite/ui/components/coral/foundation/form/multifield".equals(resourceType)) {
-            hasMultifield = true;
-            // Resource fieldResource = resource.getChild("field").getChild("items").getChild("column").getChild("items");
-//            if (fieldResource != null && fieldResource.hasChildren()) {
-//                for (Resource fieldChild : fieldResource.getChildren()) {
-//                    String fieldType = fieldChild.getValueMap().get("sling:resourceType", String.class);
-//                    if ("granite/ui/components/coral/foundation/form/multifield".equals(fieldType)) {
-//                        hasNestedMultifield = true;
-//                        break;
-//                    }
-//                }
-//            }
-        }
-        //}
-        return hasMultifield;
+        return resource.getValueMap().getOrDefault(propertyName, "").toString();
     }
 }
